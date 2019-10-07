@@ -1,0 +1,16 @@
+{
+  "name": "lightcontrol",
+  "version": "1.0.0",
+  "description": "controls a light, ez",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "iohook": "^0.6.1",
+    "wemo-client": "^0.15.0"
+  }
+}
