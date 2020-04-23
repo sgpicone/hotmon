@@ -3,11 +3,10 @@ const wemo = new Wemo({ listen_interface: "Ethernet" });
 const ioHook = require('iohook');
 const CONSTANTS = require('./constants');
 const player = require('sound-play');
-const robot = require('robotjs');
 const ping = require("net-ping");
 const ring = require('./RingBuffer')
 
-let wemoLightClient;
+
 var SerialPort = require('serialport');
 var port;// = new SerialPort("COM3");
 const Readline = require('@serialport/parser-readline');
@@ -44,18 +43,6 @@ var parseInput = function (message) {
     return retVal;
 }
 
-function toggleLightCommand() {
-    robot.keyToggle("control", "down");
-    robot.keyToggle("alt", "down");
-    robot.keyToggle("shift", "down");
-    robot.keyToggle("f11", "down");
-    robot.keyTap("f12");
-    robot.keyToggle("control", "up");
-    robot.keyToggle("alt", "up");
-    robot.keyToggle("shift", "up");
-    robot.keyToggle("f11", "up");
-}
-
 function getRandomInt(max) {
     return Math.floor(Math.random() * Math.floor(max));
 }
@@ -72,7 +59,7 @@ var actions = {
         player.play(filePath);
     },
     480: function () {
-        toggleLightCommand();
+        lightCommand();
     }
 }
 
@@ -101,65 +88,38 @@ getBoxPort((p) => {
     });
 });
 
-function foundDevice(err, deviceInfo) {
-    if (err) {
-        console.log(err);
-    }
-
-    console.log('Wemo device found: %s', deviceInfo.friendlyName);
-
-    var client = wemo.client(deviceInfo);
-    wemoLightClient = client;
-
-    client.on('error', err => {
-        console.log('Error: %s', err.code);
-    });
-
-    client.on('binaryState', value => {
-        console.log('Binary state set to %s', value);
-        console.log('binary state was %s', this.binaryState);
-        this.binaryState = value;
-        console.log('binary state IS %s', this.binaryState);
-    });
-
-    ioHook.registerShortcut([
-        CONSTANTS.KEY_CTRL,
-        CONSTANTS.KEY_SHIFT,
-        CONSTANTS.KEY_ALT,
-        CONSTANTS.KEY_F11,
-        CONSTANTS.KEY_F12], (keys) => {
-            console.log('Entered shortcut with keys: ', keys);
-            console.log('Setting to %i', +!+this.binaryState);
-            client.setBinaryState(+!+this.binaryState);
-        });
-}
 
 console.log(wemo._listenInterface);
-// wemo.discover(foundDevice);
 const wemoUrl = 'http://192.168.1.167:49153/setup.xml';
-wemo.load(wemoUrl, foundDevice);
-var wemoAttempts = 0;
-setInterval(function () {
-    var session = ping.createSession();
-    var target = '192.168.1.167';
-    session.pingHost(target, function (error, target) {
-        if (error && wemoAttempts < 5) {
-            console.log(target + ": " + error.toString());
-            console.log("trying to reconnect to wemo");
-            wemoAttempts++;
-            wemo.load(wemoUrl, foundDevice);
-        } else if (error && wemoAttempts >= 5) {
-            console.log(target + ": " + error.toString());
-            console.log("trying to reconnect to wemo with discover");
-            wemoAttempts++;
-            wemo.discover(foundDevice);
+
+
+let wemoLightClient = new Promise((resolve, reject) => {
+    console.log("connecting to wemo");
+    wemo.load(wemoUrl, (err, deviceInfo) => {
+        if (err) {
+            reject(err);
         }
-        else {
-            console.log(target + ": Alive");
-            wemoAttempts = 0;
-        }
+        console.log('Wemo device found: %s', deviceInfo.friendlyName);
+
+        var client = wemo.client(deviceInfo);
+        resolve(client);
     });
-}, 30000);
+});
+
+
+function toggleLight(wemoClient) {
+    wemoClient.getBinaryState((err,state) => {
+        console.log('Setting to %i', +!+state);
+        wemoClient.setBinaryState(+!+state);
+    })
+}
+
+function lightCommand() {
+    wemoLightClient.then((client) => {
+        toggleLight(client);
+        client = null;
+    });
+}
 
 ioHook.on('keydown', event => {
     // console.log(event);
